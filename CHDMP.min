@@ -10,6 +10,9 @@
 // @match        https://s.tradingview.com/*
 // @icon         https://www.google.com/s2/favicons?domain=www.cryptohopper.com
 // @grant        GM_addStyle
+// @grant        GM.setClipboard
+// @grant        GM_getValue
+// @grant        GM_setValue
 // ==/UserScript==
 
 /* TradingView */
@@ -25,7 +28,7 @@ var orderbook_last_price = '#4D4D4D'; // 70B //
 document.getElementsByTagName('head')[0].appendChild(orderbook_colors);
 
 /* Cryptohopper */
-/* Inject script to change range slider colors */
+/* Inject script to change range slider colors (not working yet)*/
 var setSliderColorsOverwrite = document.createElement('script');
 var SliderColor_GRN = getComputedStyle(document.body).getPropertyValue('--SliderColor_GRN');
 var SliderColor_RED = getComputedStyle(document.body).getPropertyValue('--SliderColor_RED');
@@ -51,6 +54,676 @@ script.type = "text/javascript";
 })
 `;
 document.getElementsByTagName('head')[0].appendChild(setSliderColorsOverwrite);
+
+/* Detailed stats forked from falcontx */
+/* https://github.com/markrickert/cryptohopper-dashboard-watchlist */
+
+try {
+  // Only run this code on the intended page(s) (useful when @required in a parent script)
+  if (["/dashboard"].includes(window.location.pathname))
+    (function () {
+      "use strict";
+      var base = collect_currency;
+
+      function statsDetail() {
+        jQuery(
+          "#statsinfo > div > div:nth-child(1) > div.col-xs-10 > p.text-muted.m-b-5.font-13.text-uppercase.pull-left"
+        ).contents()[0].nodeValue = "Profit (gross + positions = current):  ";
+        jQuery("#statsinfo > div > div:nth-child(1) > div.col-xs-10 > h4").prop(
+          "id",
+          "original"
+        );
+        jQuery("#original")
+          .clone()
+          .insertAfter("#original")
+          .prop("id", "gross");
+        jQuery("#original").hide();
+        jQuery("#gross").clone().insertAfter("#gross").prop("id", "positions");
+        jQuery("#positions")
+          .clone()
+          .insertAfter("#positions")
+          .prop("id", "net");
+        jQuery("#positions")
+          .addClass("text-inverse")
+          .css("border-bottom", "1px solid #555")
+          .css("display", "inline-block");
+        jQuery("#gross > strong > #stats_total_returns").prop(
+          "id",
+          "detail_total_gross"
+        );
+        jQuery("#positions > strong > #stats_total_returns").prop(
+          "id",
+          "detail_total_positions"
+        );
+        jQuery("#net > strong > #stats_total_returns").prop(
+          "id",
+          "detail_total_net"
+        );
+        jQuery("#gross > #stats_percent_change").prop(
+          "id",
+          "detail_percent_gross"
+        );
+        jQuery("#positions > #stats_percent_change").prop(
+          "id",
+          "detail_percent_positions"
+        );
+        jQuery("#net > #stats_percent_change").prop("id", "detail_percent_net");
+        jQuery("#statsinfo > div > div:nth-child(3) > div.col-xs-10").prop(
+          "id",
+          "basetotal"
+        );
+        jQuery("#basetotal").append('<hr class="m-b-15">');
+        jQuery("#basetotal").append(
+          `<p class="text-muted m-b-5 font-13 text-uppercase">${base} available on exchange:</p><h4 class="m-t-0 m-b-5 counter text-inverse"><strong><span id="val_baseavail"></span></strong> <span id="val_baseavail_percent_change_wrapper" style="display: inline;">(<span id="val_baseavail_percent_change"></span>%)</span></h4>`
+        );
+        updateValues();
+      }
+
+      function updateValues() {
+        //var netProfit = parseFloat(jQuery("#original > strong > #stats_total_returns").text());
+        var positions = parseFloat(jQuery("#stats_total_positions").text());
+        var startBalance = String(hopper_start_balance).replace(",", "");
+        var totalBalance = String(current_hopper_balance).replace(",", "");
+        var netProfit = totalBalance - startBalance;
+        var grossProfit = netProfit - positions;
+        var netProfitPct = (netProfit / startBalance) * 100;
+        var positionsPct = (positions / startBalance) * 100;
+        var grossProfitPct = (grossProfit / startBalance) * 100;
+        var baseAvail = $(
+          `#current_assets_table > tbody > tr > td:nth-child(1) > b`
+        )
+          .filter(function () {
+            return $(this).text() == base;
+          })
+          .closest("tr")
+          .children()
+          .eq(1)
+          .text();
+        var baseAvailPct = (baseAvail / totalBalance) * 100;
+
+        jQuery("#detail_total_gross").text(grossProfit.toFixed(2));
+        jQuery("#detail_percent_gross").text(grossProfitPct.toFixed(2));
+        jQuery("#detail_total_positions").text(positions.toFixed(2));
+        jQuery("#detail_percent_positions").text(positionsPct.toFixed(2));
+        jQuery("#detail_total_net").text(netProfit.toFixed(2));
+        jQuery("#detail_percent_net").text(netProfitPct.toFixed(2));
+        if (typeof jQuery("#val_totalbalance").attr("class") != "undefined") {
+          jQuery("#net").attr(
+            "class",
+            "m-t-0 m-b-5 " + jQuery("#val_totalbalance").attr("class")
+          );
+        } else {
+          jQuery("#net").attr(
+            "class",
+            jQuery("#val_totalbalance").parent().parent().attr("class")
+          );
+        }
+        if (grossProfit >= 0) {
+          jQuery("#gross").attr("class", "m-t-0 m-b-5 text-success");
+        } else {
+          jQuery("#gross").attr("class", "m-t-0 m-b-5 text-danger");
+        }
+        jQuery("#val_baseavail").text(baseAvail);
+        jQuery("#val_baseavail_percent_change").text(baseAvailPct.toFixed(2));
+      }
+
+      function watchStatsData() {
+        statsDetail();
+        jQuery(document).ajaxComplete(updateValues);
+
+        //$('body').on('DOMSubtreeModified', '#original', function() {
+        // $('body').on('DOMSubtreeModified', '#val_totalbalance', function() {
+        //   updateValues();
+        // });
+        // $('body').on('DOMSubtreeModified', '#stats_total_positions', function() {
+        //   updateValues();
+        // });
+      }
+
+      jQuery(() => {
+        watchStatsData();
+      });
+    })();
+} catch (err) {
+  console.log(
+    `Error in script target-restore.user.js: ${err.name}: ${err.message}`
+  );
+}
+
+(function () {
+  "use strict";
+
+  function watchUpdates() {
+    jQuery(document).ajaxComplete(updateValues);
+  }
+
+  jQuery(() => {});
+})();
+
+/* Disable hoppie forked from 0SkillAllLuck */
+/* https://github.com/0SkillAllLuck/cryptohopper_scripts */
+
+(function () {
+  "use strict";
+
+  jQuery(() => {
+    GM_addStyle(`
+      img.hoppie-paperclip,
+      img.hoppiePaperclipAnimation,
+      div.hoppie-speech-container,
+      div._hj_feedback_container, /* disable feedback */
+      div.fc-widget-small{ /* disable support chat */
+        display: none !important;
+      }
+    `);
+  });
+})();
+
+
+/* Backtest allowed coins forked from 0SkillAllLuck */
+/* https://github.com/0SkillAllLuck/cryptohopper_scripts */
+
+(function () {
+    'use strict';
+
+
+    function socketMessagesHandler(d) {
+        d = JSON.parse(d);
+        "chartdata" == d.type ? (result_chart_data_markings = [], drawResultChart(d, "nottest")) : "chartdatatest" == d.type ? (result_chart_data_markings = [], drawResultChart(d, "test")) : "progress" == d.type ? processProgressInfo(d, "test") : "trade" == d.type ? addTradeBacktest(d, "nottest") : "selectedtrades" == d.type ? addMultipleTradeBacktest(d, "nottest") : "selectedtradestest" == d.type ? addMultipleTradeBacktest(d, "test") : "tradetest" == d.type ? addTradeBacktest(d, "test") : "resettrades" == d.type ? (jQuery("#result_trades_table tbody tr").remove(),
+    result_chart_data_markings = [],
+    redrawChart("nottest")) : "resettradestest" == d.type ? (jQuery("#result_trades_table_test tbody tr").remove(),result_chart_data_markings = [],redrawChart("test")) : "result" == d.type ? outputBackTest(d.result) : "resulttest" == d.type ? outputConfigTest(d.result) : "error" == d.type && backtestErrorMessage(d.error)
+
+        if (d.type == "result" || d.type == "resulttest") {
+            const currentList = jQuery('#coinList').val().split(",");
+            const currentIndex = parseInt(jQuery('#coinIndex').val());
+            if (currentIndex < currentList.length) {
+                jQuery('#coinIndex').val(currentIndex + 1);
+                jQuery("#coin_test").val(currentList[currentIndex]).change();
+                setTimeout(function(){ startBackTestConfig(); }, 2000);
+            } else {
+                swal({ title: 'Success', text: 'Backtest completed, all allowed coins were tested!', type: 'success' });
+            }
+
+        }
+    }
+
+    function doBacktestAllowedCoins() {
+        var overrideScript = document.createElement('script');
+        overrideScript.innerHTML = socketMessagesHandler.toString().replace(/([\s\S]*?return;){2}([\s\S]*)}/,'$2');
+        document.body.appendChild(overrideScript);
+
+        $.get('https://www.cryptohopper.com/config', function(configPage) {
+            jQuery('#coinList').val($(configPage).find('#allowed_coins').val().join(','));
+            jQuery('#coinIndex').val('1');
+
+            jQuery("#coin_test").val(jQuery('#coinList').val().split(",")[0]).change();
+            setTimeout(function(){ startBackTestConfig(); }, 250);
+        });
+    }
+
+    function addElements() {
+        const backtestAllowedCoinsCoinList = jQuery('<input id="coinList" hidden></input>');
+        const backtestAllowedCoinsCoinIndex = jQuery('<input id="coinIndex" hidden></input>');
+        const backtestAllowedCoinsButton = jQuery('<button type="button" class="btn btn-default" style="margin-top:15px">Backtest allowed Coins</button>');
+        backtestAllowedCoinsButton.on('click', () => doBacktestAllowedCoins());
+        jQuery('#backtest-config > div > div:nth-child(1) > div').append(backtestAllowedCoinsCoinList).append(backtestAllowedCoinsCoinIndex).append(backtestAllowedCoinsButton);
+    }
+
+    jQuery(document).ready(() => addElements());
+})();
+
+/* Backtest muliple settings forked from 0SkillAllLuck */
+/* https://github.com/0SkillAllLuck/cryptohopper_scripts */
+
+(function () {
+    'use strict';
+
+
+    function socketMessagesHandler(d) {
+        d = JSON.parse(d);
+        "chartdata" == d.type ? (result_chart_data_markings = [], drawResultChart(d, "nottest")) : "chartdatatest" == d.type ? (result_chart_data_markings = [], drawResultChart(d, "test")) : "progress" == d.type ? processProgressInfo(d, "test") : "trade" == d.type ? addTradeBacktest(d, "nottest") : "selectedtrades" == d.type ? addMultipleTradeBacktest(d, "nottest") : "selectedtradestest" == d.type ? addMultipleTradeBacktest(d, "test") : "tradetest" == d.type ? addTradeBacktest(d, "test") : "resettrades" == d.type ? (jQuery("#result_trades_table tbody tr").remove(),
+    result_chart_data_markings = [],
+    redrawChart("nottest")) : "resettradestest" == d.type ? (jQuery("#result_trades_table_test tbody tr").remove(),result_chart_data_markings = [],redrawChart("test")) : "result" == d.type ? outputBackTest(d.result) : "resulttest" == d.type ? outputConfigTest(d.result) : "error" == d.type && backtestErrorMessage(d.error)
+
+        if (d.type == "result" || d.type == "resulttest") {
+            var tpList = jQuery('#tpList').val().split(",").filter(tp => tp.trim().length > 0);
+            var tpIndex = parseInt(jQuery('#tpIndex').val());
+            var slList = jQuery('#slList').val().split(",").filter(sl => sl.trim().length > 0);
+            var slIndex = parseInt(jQuery('#slIndex').val());
+            var tslList = jQuery('#tslList').val().split(",").filter(tsl => tsl.trim().length > 0);
+            var tslIndex = parseInt(jQuery('#tslIndex').val());
+
+            tpIndex += 1;
+            if (tpIndex < tpList.length) {
+                jQuery('#tpIndex').val(tpIndex);
+            } else {
+                tpIndex = 0;
+                jQuery('#tpIndex').val(tpIndex);
+
+                slIndex += 1;
+                if (slIndex < slList.length) {
+                    jQuery('#slIndex').val(slIndex);
+                } else {
+                    slIndex = 0;
+                    jQuery('#slIndex').val(slIndex);
+
+                    tslIndex += 1;
+                    if (slIndex < slList.length) {
+                        jQuery('#slIndex').val(tslIndex);
+                    } else {
+                        swal({ title: 'Success', text: 'Backtest completed, all settings were tested!', type: 'success' });
+                        return;
+                    }
+                }
+            }
+
+            if (tpList.length > 0) {
+                jQuery("#percentage_profit_test").val(tpList[tpIndex]).change();
+            }
+            if (slList.length > 0) {
+                jQuery("#stop_loss_percentage_test").val(slList[slIndex]).change();
+            }
+            if (tslList.length > 0) {
+                const tsl = tslList[tslIndex].split("-");
+                jQuery("#stop_loss_trailing_percentage_test").val(tsl[0]).change();
+                jQuery("#stop_loss_trailing_arm_test").val(tsl[1]).change();
+            }
+
+            const tps = jQuery('#tpList').val().split(",").length;
+            const sls = jQuery('#slList').val().split(",").length;
+            const tsls = jQuery('#tslList').val().split(",").length;
+            const totalBacktests = (tps > 0 ? tps : 1) * (sls > 0 ? sls : 1) * (tsls > 0 ? tsls : 1);
+            const current = (tslIndex * sls * tps) + (slIndex * tps) + tpIndex;
+            const percent = 100 * current / totalBacktests;
+            console.log(current);
+            console.log(percent + "% finished, now testing: " + jQuery("#percentage_profit_test").val() + "tp " + jQuery("#stop_loss_percentage_test").val() + "sl " + jQuery("#stop_loss_trailing_percentage_test").val() + "-" + jQuery("#stop_loss_trailing_arm_test").val()+ "tsl");
+            setTimeout(function(){ startBackTestConfig(); }, 2000);
+        }
+    }
+
+    function doBacktestMultipleSettings() {
+        swal({
+            title: 'TP Options',
+            input: 'textarea',
+            text: 'Input your tp list, comma seperated',
+            inputPlaceholder: '0.4,0.5,1.2 etc.',
+            showCancelButton: true,
+        }).then((result) => {
+            jQuery('#tpList').val(result.value).change();
+            jQuery('#tpIndex').val("0").change();
+            return swal({
+                title: 'SL Options',
+                input: 'textarea',
+                text: 'Input your sl list, comma seperated',
+                inputPlaceholder: '0.4,0.5,1.2 etc.',
+                showCancelButton: true,
+            });
+        }).then((result) => {
+            jQuery('#slList').val(result.value).change();
+            jQuery('#slIndex').val("0").change();
+            return swal({
+                title: 'TSL Options',
+                input: 'textarea',
+                text: 'Input your tsl list, comma seperated. (percent first, arm second)',
+                inputPlaceholder: '0.5-1.5,0.3-1.8,0.8-2.5 etc.',
+                showCancelButton: true,
+            });
+        }).then((result) => {
+            jQuery('#tslList').val(result.value).change();
+            jQuery('#tslIndex').val("0").change();
+
+            const tps = jQuery('#tpList').val().split(",").length;
+            const sls = jQuery('#slList').val().split(",").length;
+            const tsls = jQuery('#tslList').val().split(",").length;
+            const totalBacktests = (tps > 0 ? tps : 1) * (sls > 0 ? sls : 1) * (tsls > 0 ? tsls : 1);
+
+            return swal({
+                type: 'question',
+                title: 'Continue?',
+                text: 'You will run ' + totalBacktests + ' backtests, do you want to continue?',
+                showCancelButton: true,
+            });
+        }).then((result) => {
+            var overrideScript = document.createElement('script');
+            overrideScript.innerHTML = socketMessagesHandler.toString().replace(/([\s\S]*?return;){2}([\s\S]*)}/,'$2');
+            document.body.appendChild(overrideScript);
+
+            setTimeout(function(){ startBackTestConfig(); }, 10);
+        });
+    }
+
+    function addElements() {
+        const backtestTpList = jQuery('<input id="tpList" hidden></input>');
+        const backtestTpIndex = jQuery('<input id="tpIndex" hidden></input>');
+        const backtestSlList = jQuery('<input id="slList" hidden></input>');
+        const backtestSlIndex = jQuery('<input id="slIndex" hidden></input>');
+        const backtestTslList = jQuery('<input id="tslList" hidden></input>');
+        const backtestTslIndex = jQuery('<input id="tslIndex" hidden></input>');
+        const backtestMultipleSettingsButton = jQuery('<button type="button" class="btn btn-success btn-lg">Backtest multiple settings</button>');
+        backtestMultipleSettingsButton.on('click', () => doBacktestMultipleSettings());
+        jQuery('#backtest-config > div > div:nth-child(20) > div')
+            .append(backtestTpList).append(backtestTpIndex)
+            .append(backtestSlList).append(backtestSlIndex)
+            .append(backtestTslList).append(backtestTslIndex)
+            .append(backtestMultipleSettingsButton);
+
+    }
+
+    jQuery(document).ready(() => addElements());
+})();
+
+/* AI learn allowed coins forked from 0SkillAllLuck */
+/* https://github.com/0SkillAllLuck/cryptohopper_scripts */
+
+(function () {
+    'use strict';
+
+    function trainCoinPairs(config, coinPairs, currentQueueSize) {
+        if (coinPairs.length < 1) {
+            swal({
+                title: 'Success',
+                text: 'All allowed coins added to training queue!',
+                type: 'success',
+            });
+            return finishTraining(currentQueueSize);
+        }
+
+        if (currentQueueSize >= max_trainings) {
+            const pairsRemaining = coinPairs.join(', ');
+            swal({
+                title: 'Full queue',
+                text: `Training queue filled up! Remaining coins: ${pairsRemaining}`,
+                type: 'error',
+            });
+            return finishTraining(currentQueueSize);
+        }
+
+        const currentCoinPair = coinPairs.pop();
+        console.log(`Starting training for coin pair ${currentCoinPair}...`);
+
+        doApiCall(
+            'convertmarket',
+            {
+                exchange: config.exchange,
+                market: currentCoinPair,
+            },
+            (result) => {
+                doApiCall(
+                    'trainai',
+                    {
+                        ...config,
+                        pair: result.pair,
+                    },
+                    (_result) => {
+                        console.log(`${currentCoinPair} added to training queue`);
+
+                        refreshAITrainings();
+                        setTimeout(
+                            () => trainCoinPairs(config, coinPairs, currentQueueSize + 1),
+                            1200
+                        );
+                    },
+                    (error) => {
+                        swal({ title: 'Error', text: error, timer: 4e3, type: 'error' });
+                        finishTraining(currentQueueSize);
+                    }
+                );
+            },
+            (error) => {
+                swal({ title: 'Error', text: error, timer: 4e3, type: 'error' });
+                finishTraining(currentQueueSize);
+            }
+        );
+    }
+
+    function startTrainingCoinPairs(coinPairs) {
+        const config = {};
+        config.id = jQuery('#ai_id').val();
+        if (config.id == 'new') {
+            return swal({
+                title: 'Error',
+                text: 'You cannot train a new AI. Please save your AI first.',
+                timer: 4e3,
+                type: 'error',
+            });
+        }
+
+        const button = jQuery('#learnAIButton');
+        button.html('<i class="fa fa-refresh fa-spin m-r-5"></i>');
+        button.prop('disabled', true);
+
+        const strategy = jQuery('#selected_strategy_id option:selected');
+        config.exchange = jQuery('#select_exchange').val();
+        config.strategy_id = strategy.val();
+        config.strategy_type = strategy.data('type');
+
+        // Get training queue and start training
+        doApiCall(
+            'loadaitraining',
+            {
+                id: config.id,
+            },
+            (result) => {
+                // Filter out unavailable pairs
+                const availablePairs = window
+                    .jQuery('#select_market option')
+                    .map(function () {
+                        return jQuery(this).val();
+                    })
+                    .get();
+
+                coinPairs = coinPairs.filter((coinPair) => {
+                    const splitPair = coinPair.split('/');
+                    return (
+                        !!availablePairs.find((availablePair) => availablePair === coinPair) &&
+                        !result.data.find(
+                            (training) =>
+                                training.strategy_id == config.strategy_id &&
+                                training.exchange == config.exchange &&
+                                training.pair.includes(splitPair[0]) &&
+                                training.pair.includes(splitPair[1])
+                        )
+                    );
+                });
+                console.log('Coins available to train: ', coinPairs.join(', '));
+
+                // Start training
+                trainCoinPairs(config, coinPairs, result.total_trainings);
+            },
+            (error) => {
+                swal({ title: 'Error', text: error, timer: 4e3, type: 'error' });
+                jQuery('#learnAIButton').html('<i class="md md-android m-r-5"></i> Learn');
+            }
+        );
+    }
+
+    function finishTraining(currentQueueSize) {
+        jQuery('#learnAIButton').html('<i class="md md-android m-r-5"></i> Learn');
+        return setAILearnButton(currentQueueSize);
+    }
+
+    function doTrainAIAllowedCoins() {
+        $.get('https://www.cryptohopper.com/config', function(configPage) {
+            const base = $(configPage).find('#collect_currency').val().toUpperCase();
+            const coinPairList = $(configPage).find('#allowed_coins').val().map((coin) => `${coin}/${base}`);
+            startTrainingCoinPairs(coinPairList);
+        });
+    }
+
+    function addElements() {
+        const button = jQuery('<button type="button" class="btn waves-effect waves-light btn-primary"><i class="md md-android m-r-5"></i> Learn Allowed Coins</button>');
+        const buttonGroup = jQuery('<div class="input-group pull-right"></div>');
+        buttonGroup.append(button);
+
+        jQuery('#ai_training > div:nth-child(1) > div > div > div > div.col-md-8.col-lg-9 > div').append(buttonGroup);
+
+        button.on('click', () => doTrainAIAllowedCoins());
+    }
+
+    jQuery(document).ready(() => addElements());
+})();
+
+/* AI show all markets forked from coffeeneer */
+/* https://github.com/coffeeneer/cryptohopper_scripts */
+
+(function () {
+  'use strict';
+
+  function showAllMarkets() {
+    jQuery('#best_scoring_markets_table tr').show();
+  }
+
+  function addElements() {
+    const button = jQuery('<a href="#">Show hidden &gt;</a>');
+    const col = jQuery('<div class="col-md-12"></div>');
+    const row = jQuery('<div class="row"></div>');
+    col.append(button);
+    row.append(col);
+
+    jQuery('#best_scoring_markets_table').parent().before(row);
+
+    button.on('click', () => showAllMarkets());
+  }
+
+  jQuery(document).ready(() => addElements());
+})();
+
+/* Export saved trade history forked from falcontx */
+/* https://github.com/markrickert/cryptohopper-dashboard-watchlist */
+
+try {
+  // Only run this code on the intended page(s) (useful when @required in a parent script)
+  if (["/trade-history"].includes(window.location.pathname))
+    (function () {
+      "use strict";
+
+      const EXPORT_KEY = "export-trade-history-settings";
+      const EXPORT_BUTTON_NAME = "#export-saved-trade-history";
+      const SAVE_BUTTON_NAME = "#save-export-settings";
+      const LOAD_BUTTON_NAME = "#load-export-settings";
+      const BUTTON_PRIMARY_CLASS = "btn btn-primary waves-effect waves-light";
+      const BUTTON_SECONDARY_CLASS = "btn btn-default waves-effect";
+      var buttonsAdded = false;
+
+      // This function loads the currently saved settings
+      function loadSavedSettings() {
+        var exportSettings = JSON.parse(GM_getValue(EXPORT_KEY));
+
+        // Apply saved settings
+        $("#export_type").val(exportSettings.format);
+        $("#check_sells").prop("checked", exportSettings.buys);
+        $("#check_buys").prop("checked", exportSettings.sells);
+        $("#export_daterange").val(exportSettings.daterange);
+      }
+
+      // This function sets our CSS
+      function setStyles() {
+        GM_addStyle(`
+        button${EXPORT_BUTTON_NAME},
+        button${SAVE_BUTTON_NAME} {
+          margin-right: 3px;
+        }
+        button${LOAD_BUTTON_NAME} {
+          margin-right: 2px;
+        }
+      `);
+      }
+
+      // This function adds the Export Saved button and handles click events
+      function exportButtonHandler() {
+        if (
+          !$(EXPORT_BUTTON_NAME).length &&
+          GM_getValue(EXPORT_KEY, false) !== false
+        ) {
+          // Add the Export Saved button
+          $(`button[onclick="jQuery('#exportDiv').toggle()"]`).before(
+            `<button type="button" id="${EXPORT_BUTTON_NAME.replace(
+              "#",
+              ""
+            )}" class="${BUTTON_PRIMARY_CLASS}"><i class="fa fa-download m-r-5"></i> Export Saved</button>`
+          );
+
+          // Handle clicks of the Export Saved button
+          $(EXPORT_BUTTON_NAME).on("click", function () {
+            loadSavedSettings();
+
+            startExport();
+          });
+
+          buttonsAdded = true;
+        }
+      }
+
+      // This function saves the current settings when exporting
+      function saveSettingsButtonHandler() {
+        // Add the Save Settings button
+        $('button[onclick="startExport()"]').before(
+          `<button type="button" id="${SAVE_BUTTON_NAME.replace(
+            "#",
+            ""
+          )}" class="${BUTTON_PRIMARY_CLASS}">Save Settings</button>`
+        );
+
+        // Handle clicks of the Save Settings button
+        $(SAVE_BUTTON_NAME).on("click", function () {
+          var format = $("#export_type").val();
+          var buys = $("#check_sells").prop("checked");
+          var sells = $("#check_buys").prop("checked");
+          var daterange = $("#export_daterange").val();
+
+          // Save these values for future use
+          GM_setValue(
+            EXPORT_KEY,
+            JSON.stringify({
+              format: format,
+              buys: buys,
+              sells: sells,
+              daterange: daterange,
+            })
+          );
+
+          // If this is the first time saving, add the Export Saved and Load Settings buttons
+          if (!buttonsAdded) {
+            exportButtonHandler();
+            loadSettingsButtonHandler();
+          }
+        });
+      }
+
+      // This function loads the currently saved settings
+      function loadSettingsButtonHandler() {
+        if (
+          !$(LOAD_BUTTON_NAME).length &&
+          GM_getValue(EXPORT_KEY, false) !== false
+        ) {
+          // Add the Load Settings button
+          $(SAVE_BUTTON_NAME).before(
+            `<button type="button" id="${LOAD_BUTTON_NAME.replace(
+              "#",
+              ""
+            )}" class="${BUTTON_SECONDARY_CLASS}">Load Settings</button>`
+          );
+
+          // Handle clicks of the Load Settings button
+          $(LOAD_BUTTON_NAME).on("click", loadSavedSettings);
+
+          buttonsAdded = true;
+        }
+      }
+
+      jQuery(() => {
+        setStyles();
+        exportButtonHandler();
+        saveSettingsButtonHandler();
+        loadSettingsButtonHandler();
+      });
+    })();
+} catch (err) {
+  console.log(
+    `Error in script export-saved-trade-history.user.js: ${err.name}: ${err.message}`
+  );
+}
+
 /* Cryptohopper CSS */
 (function () {
     jQuery(() => {
@@ -1238,7 +1911,7 @@ body.nightmode table.dataTable td.focus, table.dataTable th.focus {
     outline:var(--HB) solid 3px !important;
     outline-offset:-1px;
 }
-table.dataTable.dtr-inline.collapsed>tbody>tr>td:first-child:before, table.dataTable.dtr-inline.collapsed>tbody>tr>th:first-child:before {
+body.nightmode table.dataTable.dtr-inline.collapsed>tbody>tr>td:first-child:before, table.dataTable.dtr-inline.collapsed>tbody>tr>th:first-child:before {
     top:9px;
     left:6px;
     height:18px;
@@ -1253,7 +1926,7 @@ table.dataTable.dtr-inline.collapsed>tbody>tr>td:first-child:before, table.dataT
     background-color:var(--HB);
 	box-shadow:none;
 }
-table.dataTable.dtr-inline.collapsed>tbody>tr.parent>td:first-child:before, table.dataTable.dtr-inline.collapsed>tbody>tr.parent>th:first-child:before {
+body.nightmode table.dataTable.dtr-inline.collapsed>tbody>tr.parent>td:first-child:before, table.dataTable.dtr-inline.collapsed>tbody>tr.parent>th:first-child:before {
     background-color:var(--RED);
 }
 body.nightmode .fixedHeader-floating {
