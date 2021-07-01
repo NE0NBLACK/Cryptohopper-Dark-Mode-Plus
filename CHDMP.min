@@ -994,6 +994,12 @@ body.nightmode .label {
 	vertical-align:middle;
     border-radius:2px;
 }
+body.nightmode .label-default {
+    background-color:var(--70B) !important;
+	border:1px solid var(--70B)!important;
+    margin-top: -7px !important; /* alignment fix */
+    margin-right: 2px !important; /* alignment fix */
+}
 body.nightmode .label-primary {
     background-color:var(--HB) !important;
 	border:1px solid var(--HB)!important;
@@ -1511,6 +1517,10 @@ body.nightmode .btn-default {
 }
 body.nightmode .btn-link {
     color:var(--10B);
+}
+body.nightmode .btn-link.pull-right {
+    margin-right: -6px !important; /* alignment fix */
+    padding-left: 18px !important; /* alignment fix */
 }
 .btn-link:focus, .btn-link:hover {
     color:var(--00B);
@@ -2582,6 +2592,10 @@ body.nightmode #setManualBuyButton.btn-success {
 body.nightmode #setManualSellButton.btn-danger {
     background-color:var(--RED) !important;
     border:1px solid var(--RED) !important;
+}
+body.nightmode .content-page .page-title-box .btn-link {
+    color: var(--70B) !important;
+	margin-top: -11px !important;
 }
 body.nightmode .full_screen_tv_chart {
     background-color:var(--70B) !important;
