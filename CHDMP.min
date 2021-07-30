@@ -551,7 +551,7 @@ try {
     }
 
     function addElements() {
-        const button = jQuery('<button type="button" class="btn waves-effect waves-light btn-primary"><i class="md md-android m-r-5"></i> Learn Allowed Coins</button>');
+        const button = jQuery('<button type="button" class="btn waves-effect waves-light btn-primary" style="margin-top: 15px"><i class="md md-android m-r-5"></i> Learn Allowed Coins</button>');
         const buttonGroup = jQuery('<div class="input-group pull-right"></div>');
         buttonGroup.append(button);
 
